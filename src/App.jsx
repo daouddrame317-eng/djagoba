@@ -8,35 +8,68 @@ import MonCompteTab from './components/MonCompteTab';
 import AgoraLivePlayer from './components/AgoraLivePlayer';
 import AgoraSellerStudio from './components/AgoraSellerStudio';
 import PwaInstallBanner from './components/PwaInstallBanner';
-import { LIVES_EN_DIRECT, PROCHAINS_LIVES } from './data/mockData';
 import { Bell, X, CheckCircle, Info } from 'lucide-react';
-
+import { supabase, getUserProfile } from './lib/supabaseClient';
+import { initPushNotifications } from './lib/pushNotifications';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('accueil');
   const [selectedCity, setSelectedCity] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Data states
-  const [lives, setLives] = useState(LIVES_EN_DIRECT);
-  const [upcomingLives, setUpcomingLives] = useState(PROCHAINS_LIVES);
-  const [userOrders, setUserOrders] = useState([]);
-  
-  // UI Modal states
+  // Auth Global State
+  const [currentUser, setCurrentUser] = useState(null);
   const [activeLiveModal, setActiveLiveModal] = useState(null);
   const [isSellerMode, setIsSellerMode] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
-  // Register PWA Service Worker
+  // Initialisation Supabase Auth Session & PWA Push Notifications
   useEffect(() => {
+    initPushNotifications();
+
+    // Récupérer la session Supabase Auth au démarrage
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        getUserProfile(session.user.id).then((profile) => {
+          setCurrentUser(profile || {
+            id: session.user.id,
+            email: session.user.email,
+            full_name: session.user.user_metadata?.full_name || 'Utilisateur DJAGOBA',
+            role: session.user.user_metadata?.role || 'buyer',
+            city: session.user.user_metadata?.city || 'Bingerville',
+          });
+        });
+      }
+    });
+
+    // Écouter les changements de session Auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        getUserProfile(session.user.id).then((profile) => {
+          setCurrentUser(profile || {
+            id: session.user.id,
+            email: session.user.email,
+            full_name: session.user.user_metadata?.full_name || 'Utilisateur DJAGOBA',
+            role: session.user.user_metadata?.role || 'buyer',
+            city: session.user.user_metadata?.city || 'Bingerville',
+          });
+        });
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    // Service Worker PWA
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch((err) => {
-          console.log('ServiceWorker registration failed: ', err);
+          console.log('ServiceWorker registration info:', err);
         });
       });
     }
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const showToast = (message) => {
@@ -46,33 +79,14 @@ export default function App() {
     }, 3500);
   };
 
-  const handleToggleUpcomingAlert = (id) => {
-    setUpcomingLives((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const nextState = !item.isAlertSet;
-          showToast(
-            nextState
-              ? `🔔 Rappel activé pour "${item.title}". Vous recevrez une notification PWA au lancement du direct !`
-              : `🔕 Rappel désactivé pour "${item.title}".`
-          );
-          return { ...item, isAlertSet: nextState };
-        }
-        return item;
-      })
-    );
-  };
-
   const handlePlaceOrderFromLive = (newOrder) => {
-    setUserOrders((prev) => [newOrder, ...prev]);
-    showToast(`🎉 Commande ${newOrder.id} enregistrée ! Redirection vers le suivi de livraison...`);
+    showToast(`🎉 Commande N° ${newOrder.id?.toString().slice(0, 8)} enregistrée avec succès !`);
     setTimeout(() => {
       setActiveTab('commandes');
-    }, 1600);
+    }, 1500);
   };
 
   const handleStartNewLive = (newLive) => {
-    setLives((prev) => [newLive, ...prev]);
     setActiveLiveModal(newLive);
     showToast(`🔴 Votre Direct Video "${newLive.title}" est maintenant en ligne !`);
   };
@@ -80,7 +94,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans antialiased selection:bg-[#FF6B00] selection:text-white">
       
-      {/* PWA Floating Installation Prompt */}
+      {/* PWA Floating Installation Banner */}
       <PwaInstallBanner />
 
       {/* Top Header */}
@@ -89,7 +103,7 @@ export default function App() {
         setSelectedCity={setSelectedCity}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        unreadNotifications={upcomingLives.filter(u => u.isAlertSet).length}
+        unreadNotifications={0}
         onOpenNotifications={() => setIsNotificationsOpen(true)}
       />
 
@@ -97,12 +111,9 @@ export default function App() {
       <main className="transition-all duration-300">
         {activeTab === 'accueil' && (
           <AccueilTab
-            lives={lives}
-            upcomingLives={upcomingLives}
             selectedCity={selectedCity}
             searchQuery={searchQuery}
             onOpenLive={(live) => setActiveLiveModal(live)}
-            onToggleUpcomingAlert={handleToggleUpcomingAlert}
           />
         )}
 
@@ -115,15 +126,18 @@ export default function App() {
 
         {activeTab === 'commandes' && (
           <CommandesTab
-            userOrders={userOrders}
+            currentUser={currentUser}
           />
         )}
 
         {activeTab === 'compte' && (
           <MonCompteTab
+            currentUser={currentUser}
+            setCurrentUser={setCurrentUser}
             isSellerMode={isSellerMode}
             setIsSellerMode={setIsSellerMode}
             onStartNewLive={handleStartNewLive}
+            showToast={showToast}
           />
         )}
       </main>
@@ -132,7 +146,7 @@ export default function App() {
       <BottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        activeOrdersCount={userOrders.length}
+        currentUserRole={currentUser?.role}
         isSellerMode={isSellerMode}
       />
 
@@ -140,13 +154,13 @@ export default function App() {
       {activeLiveModal && (
         <AgoraLivePlayer
           live={activeLiveModal}
+          currentUser={currentUser}
           onClose={() => setActiveLiveModal(null)}
           onPlaceOrder={handlePlaceOrderFromLive}
         />
       )}
 
-
-      {/* GLOBAL TOAST NOTIFICATION PROMPT */}
+      {/* GLOBAL TOAST NOTIFICATION */}
       {toastMessage && (
         <div className="fixed bottom-20 left-4 right-4 z-50 max-w-md mx-auto pointer-events-none animate-in slide-in-from-bottom duration-300">
           <div className="bg-[#1A1A1A] text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl border border-gray-700 flex items-center gap-2.5 pointer-events-auto">
@@ -170,18 +184,8 @@ export default function App() {
               </button>
             </div>
 
-            <div className="space-y-2">
-              {upcomingLives.filter(u => u.isAlertSet).length > 0 ? (
-                upcomingLives.filter(u => u.isAlertSet).map((u) => (
-                  <div key={u.id} className="p-3 bg-[#FF6B00]/10 rounded-xl border border-[#FF6B00]/20 space-y-1">
-                    <span className="text-[10px] font-bold text-[#FF6B00]">Alerte Active</span>
-                    <h4 className="text-xs font-bold text-[#1A1A1A]">{u.title}</h4>
-                    <p className="text-[11px] text-gray-500">{u.date} à {u.time}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-gray-400 text-center py-8">Aucune alerte configurée.</p>
-              )}
+            <div className="space-y-2 text-center py-8 text-xs text-gray-400">
+              Aucune notification non lue.
             </div>
           </div>
         </div>

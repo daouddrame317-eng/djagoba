@@ -1,6 +1,5 @@
 // Service de gestion des Notifications Push (OneSignal Web SDK & Web Push API)
-
-export const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || 'demo-onesignal-app-id-djagoba';
+import { ONESIGNAL_APP_ID } from './config';
 
 /**
  * Initialiser OneSignal et demander la permission lors de la première visite
@@ -8,7 +7,7 @@ export const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || 'demo-o
 export async function initPushNotifications() {
   if (typeof window === 'undefined') return;
 
-  // 1. Demande de permission native de la navigateur/PWA si OneSignal n'est pas encore chargé
+  // 1. Demande de permission native de la navigateur/PWA
   if ('Notification' in window) {
     if (Notification.permission === 'default') {
       try {
@@ -22,7 +21,7 @@ export async function initPushNotifications() {
     }
   }
 
-  // 2. Chargement du SDK OneSignal Web si présent
+  // 2. Initialisation du SDK OneSignal Web
   if (window.OneSignal) {
     window.OneSignal.push(function () {
       window.OneSignal.init({
@@ -38,22 +37,45 @@ export async function initPushNotifications() {
 }
 
 /**
- * Déclencher une notification Push lorsqu'un vendeur suivi lance un direct
+ * Déclencher une notification Push OneSignal lorsqu'un vendeur lance son statut à `live`
  */
 export async function triggerSellerLivePushNotification({ sellerName, liveTitle, liveId }) {
-  // Notification locale immédiate si la permission est accordée
+  // 1. Notification locale PWA immédiate
   if ('serviceWorker' in navigator && Notification.permission === 'granted') {
-    const registration = await navigator.serviceWorker.ready;
-    registration.showNotification(`🔴 ${sellerName} est EN DIRECT !`, {
-      body: `Nouveau direct : "${liveTitle}". Cliquez pour rejoindre la vente en direct sur DJAGOBA !`,
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
-      vibrate: [200, 100, 200],
-      tag: `live-${liveId || Date.now()}`,
-      data: { url: `/?liveId=${liveId || 'live-1'}` }
-    });
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      registration.showNotification(`🔴 ${sellerName} est EN DIRECT !`, {
+        body: `Nouveau direct : "${liveTitle}". Cliquez pour rejoindre la vente en direct sur DJAGOBA !`,
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
+        vibrate: [200, 100, 200],
+        tag: `live-${liveId || Date.now()}`,
+        data: { url: `/?liveId=${liveId}` }
+      });
+    } catch (err) {
+      console.log('Push local error:', err);
+    }
   }
 
-  // Simulation de l'appel REST à l'API OneSignal Backend
-  console.log(`[OneSignal Push Trigger] Direct notifié pour le vendeur ${sellerName}: "${liveTitle}"`);
+  // 2. Appel REST API OneSignal v1/notifications si la clé APP ID est configurée
+  if (ONESIGNAL_APP_ID) {
+    try {
+      await fetch('https://onesignal.com/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          app_id: ONESIGNAL_APP_ID,
+          included_segments: ['Subscribed Users'],
+          headings: { fr: `🔴 ${sellerName} est EN DIRECT !`, en: `🔴 ${sellerName} is LIVE!` },
+          contents: { fr: `Nouveau direct : "${liveTitle}". Cliquez pour acheter en direct !`, en: `New live: "${liveTitle}".` },
+          data: { liveId: liveId },
+        }),
+      });
+      console.log(`[OneSignal Push OK] Notification envoyée aux abonnés pour le live "${liveTitle}"`);
+    } catch (err) {
+      console.warn('OneSignal REST Push Call warning:', err);
+    }
+  }
 }

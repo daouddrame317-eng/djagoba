@@ -1,7 +1,23 @@
 import React from 'react';
-import { Radio, Store, ShoppingBag, User } from 'lucide-react';
+import { Radio, Store, ShoppingBag, User, Bike } from 'lucide-react';
 
-export default function BottomNav({ activeTab, setActiveTab, activeOrdersCount, isSellerMode }) {
+export default function BottomNav({ activeTab, setActiveTab, activeOrdersCount, currentUserRole, isSellerMode }) {
+  const accountLabel = currentUserRole === 'courier'
+    ? 'Espace Livreur'
+    : currentUserRole === 'seller' || isSellerMode
+    ? 'Studio Vendeur'
+    : 'Mon Compte';
+
+  const accountBadge = currentUserRole === 'courier'
+    ? 'LIVREUR'
+    : currentUserRole === 'seller' || isSellerMode
+    ? 'PRO'
+    : null;
+
+  const accountBadgeColor = currentUserRole === 'courier'
+    ? 'bg-[#00C853]'
+    : 'bg-purple-600';
+
   const tabs = [
     {
       id: 'accueil',
@@ -30,10 +46,10 @@ export default function BottomNav({ activeTab, setActiveTab, activeOrdersCount, 
     {
       id: 'compte',
       label: 'Mon Compte',
-      shortLabel: isSellerMode ? 'Studio Vendeur' : 'Mon Compte',
-      icon: User,
-      badge: isSellerMode ? 'PRO' : null,
-      badgeColor: 'bg-purple-600'
+      shortLabel: accountLabel,
+      icon: currentUserRole === 'courier' ? Bike : User,
+      badge: accountBadge,
+      badgeColor: accountBadgeColor
     }
   ];
 
