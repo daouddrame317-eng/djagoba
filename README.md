@@ -1,16 +1,31 @@
-# React + Vite
+# 🛒 DJAGOBA – Plateforme Live Shopping & PWA (Côte d'Ivoire 🇨🇮)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+DJAGOBA est une Progressive Web App (PWA) de **Live Shopping** optimisée pour le marché ivoirien.
 
-Currently, two official plugins are available:
+## 🚀 Stack Technique & Services de Production
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Frontend & PWA** : React 19 + Vite + TailwindCSS (Mobile-First, Offline PWA Service Worker).
+- **Backend & Database** : Supabase (PostgreSQL, Row Level Security, Supabase Auth avec 3 rôles : `buyer`, `seller`, `courier`).
+- **Realtime** : Supabase Realtime (Abonnements en temps réel sur `comments`, `lives`, `orders`).
+- **Video Live Streaming** : Agora.io RTC Web SDK (`VITE_AGORA_APP_ID`).
+- **Paiement Mobile Money** : Digitalpaye & Wave API (`VITE_DIGITALPAYE_PUBLIC_KEY` - Wave, Orange Money, MTN, Moov) + Edge Function (`payment-webhook`).
+- **Notifications Push** : OneSignal Web Push SDK (`VITE_ONESIGNAL_APP_ID`).
+- **Hébergement & CI/CD** : Vercel (`https://djagoba.vercel.app/`).
 
-## React Compiler
+## 🛠️ Installation & Lancement Local
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# Installation des dépendances
+npm install
 
-## Expanding the Oxlint configuration
+# Lancement du serveur de développement
+npm run dev
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+# Compilation pour la production
+npm run build
+```
+
+## 🌐 Déploiement
+
+- **GitHub** : `https://github.com/daouddrame317-eng/djagoba.git`
+- **Vercel** : `https://djagoba.vercel.app/`
