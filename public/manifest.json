@@ -1,0 +1,42 @@
+{
+  "short_name": "DJAGOBA",
+  "name": "DJAGOBA Live Shopping Côte d'Ivoire",
+  "description": "Première plateforme PWA de Live Shopping Mobile-First en Côte d'Ivoire (Abidjan, Bingerville, Bouaké, San-Pédro). Achetez en direct avec vos vendeurs certifiés !",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8F9FA",
+  "theme_color": "#FF6B00",
+  "categories": ["shopping", "lifestyle", "social"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "48x48 72x72 96x96 128x128 192x192 256x256 512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "En Directs 🔴",
+      "short_name": "Directs",
+      "description": "Voir les ventes en direct actuellement",
+      "url": "/?tab=accueil",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Boutiques Certifiées 🛍️",
+      "short_name": "Boutiques",
+      "description": "Liste des vendeurs vérifiés",
+      "url": "/?tab=boutiques",
+      "icons": [{ "src": "/favicon.svg", "sizes": "192x192" }]
+    }
+  ]
+}
