@@ -47,7 +47,7 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
 
   const chatContainerRef = useRef(null);
 
-  // 1. Initialisation Agora RTC Audience Player
+  // 1. Initialisation Agora RTC Audience Player (Connexion immédiate et réactive)
   useEffect(() => {
     let agoraClientInstance = null;
 
@@ -57,8 +57,12 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
       const { client, error } = await startAudiencePlayer({
         channel: channelName,
         containerId: 'agora-remote-player-container',
-        onUserPublished: () => setAgoraConnected(true),
-        onUserUnpublished: () => setAgoraConnected(false)
+        onUserPublished: (user, mediaType) => {
+          setAgoraConnected(true);
+        },
+        onUserUnpublished: () => {
+          setAgoraConnected(false);
+        }
       });
 
       if (error) {
@@ -68,7 +72,7 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
       }
     }
 
-    if (live?.agora_channel_id) {
+    if (live?.agora_channel_id || live?.id) {
       initPlayer();
     }
 
@@ -421,7 +425,7 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
                         type="text"
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="Awa Traoré"
+                        placeholder="Nom et Prénom"
                         className="w-full p-2.5 bg-[#F8F9FA] rounded-xl border border-gray-200"
                         required
                       />

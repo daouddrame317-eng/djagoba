@@ -110,6 +110,21 @@ export default function CommandesTab({ currentUser }) {
             </div>
           </div>
 
+          {/* ESCROW BADGE (Séquestre de Paiement) */}
+          <div className="bg-amber-50 rounded-2xl p-2.5 border border-amber-200/80 flex items-center justify-between gap-2 text-[11px]">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+              <span className="font-bold text-amber-900">
+                {selectedOrder.escrow_status === 'released' 
+                  ? '💰 Séquestre libéré : Fonds transférés au vendeur.' 
+                  : '🔒 Séquestre de Paiement Djagoba : Fonds bloqués en sécurité jusqu\'à la livraison.'}
+              </span>
+            </div>
+            <span className="text-[9px] font-black uppercase bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md shrink-0">
+              {selectedOrder.escrow_status === 'released' ? 'Libéré' : 'Verrouillé'}
+            </span>
+          </div>
+
           {/* REAL-TIME DELIVERY TIMELINE (4 STEPS) */}
           <div className="space-y-2 py-1">
             <span className="text-xs font-bold text-gray-700 block">Progression de Livraison</span>

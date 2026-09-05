@@ -83,7 +83,7 @@ export default function LiveStreamModal({ live, onClose, onPlaceOrder }) {
       ...prev,
       {
         id: Date.now(),
-        user: 'Vous (Awa Traoré)',
+        user: 'Vous (Spectateur)',
         text: inputComment,
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
       }

@@ -34,6 +34,9 @@ import {
   signUpUser, 
   signInUser, 
   signOutUser, 
+  signInWithGoogle,
+  sendPhoneOtp,
+  verifyPhoneOtp,
   createLiveInSupabase, 
   createProductInSupabase, 
   fetchProductsBySeller,
@@ -53,6 +56,7 @@ export default function MonCompteTab({
   // Auth Form State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('signup'); // 'signup' | 'signin'
+  const [authMethod, setAuthMethod] = useState('email'); // 'email' | 'phone'
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -61,6 +65,8 @@ export default function MonCompteTab({
   const [authRole, setAuthRole] = useState('seller'); // 'buyer' | 'seller' | 'courier'
   const [authCity, setAuthCity] = useState('Bingerville');
   const [authLoading, setAuthLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpToken, setOtpToken] = useState('');
 
   // Live Studio Setup State
   const [isLiveSetupOpen, setIsLiveSetupOpen] = useState(false);
@@ -80,7 +86,60 @@ export default function MonCompteTab({
     }
   }, [currentUser?.id, currentUser?.role]);
 
-  // Handle Auth Submit (100% sans erreur 'Failed to fetch')
+  // Handle Google OAuth Sign In
+  const handleGoogleSignIn = async () => {
+    setAuthLoading(true);
+    const { user, error } = await signInWithGoogle();
+    setAuthLoading(false);
+    if (error) {
+      showToast(`❌ ${error}`);
+    } else if (user) {
+      setCurrentUser(user);
+      if (user.role === 'seller') setIsSellerMode(true);
+      setIsAuthModalOpen(false);
+      showToast(`🌐 Connecté avec Google : ${user.full_name || user.email}`);
+    }
+  };
+
+  // Handle Send Phone OTP SMS (+225)
+  const handleSendPhoneOtp = async (e) => {
+    e.preventDefault();
+    if (!authPhone.trim()) {
+      showToast('❌ Veuillez renseigner votre numéro de téléphone (+225).');
+      return;
+    }
+    setAuthLoading(true);
+    const res = await sendPhoneOtp(authPhone);
+    setAuthLoading(false);
+    if (res.success) {
+      setOtpSent(true);
+      showToast(`📲 Code SMS envoyé au ${res.formattedPhone} ! (Code démo : 123456)`);
+    } else {
+      showToast(`❌ ${res.message || 'Erreur envoi SMS'}`);
+    }
+  };
+
+  // Handle Verify Phone OTP SMS
+  const handleVerifyPhoneOtp = async (e) => {
+    e.preventDefault();
+    if (!otpToken.trim()) {
+      showToast('❌ Veuillez saisir le code SMS à 6 chiffres.');
+      return;
+    }
+    setAuthLoading(true);
+    const { user, error } = await verifyPhoneOtp(authPhone, otpToken, authRole, authFullName);
+    setAuthLoading(false);
+    if (error) {
+      showToast(`❌ ${error}`);
+    } else {
+      setCurrentUser(user);
+      if (user.role === 'seller') setIsSellerMode(true);
+      setIsAuthModalOpen(false);
+      showToast(`🎉 Connexion SMS réussie ! Bienvenue ${user.full_name}`);
+    }
+  };
+
+  // Handle Auth Submit Email/Password
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthLoading(true);
@@ -163,8 +222,8 @@ export default function MonCompteTab({
       setCurrentUser((prev) => ({ ...prev, role: newRole }));
     } else {
       setCurrentUser({
-        id: `demo-${newRole}`,
-        full_name: newRole === 'seller' ? 'Boutique Awa (Vendeur)' : newRole === 'courier' ? 'Koffi Express (Livreur)' : 'Awa Traoré (Acheteur)',
+        id: `usr-${newRole}-${Date.now()}`,
+        full_name: newRole === 'seller' ? 'Ma Boutique Certifiée' : newRole === 'courier' ? 'Livreur Express CI' : 'Acheteur DJAGOBA',
         role: newRole,
         city: 'Bingerville',
       });
@@ -391,7 +450,7 @@ export default function MonCompteTab({
                 className="w-14 h-14 rounded-full border-2 border-[#FF6B00] object-cover shadow-sm bg-white"
               />
               <div>
-                <h3 className="text-sm font-extrabold text-[#1A1A1A]">{currentUser?.full_name || "Awa Traoré"}</h3>
+                <h3 className="text-sm font-extrabold text-[#1A1A1A]">{currentUser?.full_name || "Acheteur DJAGOBA"}</h3>
                 <p className="text-xs text-gray-500 flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-[#FF6B00]" />
                   {currentUser?.city || 'Bingerville'}, Côte d'Ivoire
@@ -416,13 +475,13 @@ export default function MonCompteTab({
         </div>
       )}
 
-      {/* AUTHENTICATION MODAL (DESIGN STITCH HIGH QUALITY - 100% FIX "Failed to fetch") */}
+      {/* AUTHENTICATION MODAL (SUPABASE OAUTH + SMS OTP + EMAIL) */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl animate-in zoom-in-95 border border-gray-100 overflow-hidden relative">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 space-y-4 shadow-2xl animate-in zoom-in-95 border border-gray-100 overflow-hidden relative">
             
             {/* Modal Top Banner */}
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3.5">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-[#FF6B00]/10 flex items-center justify-center text-[#FF6B00]">
                   <Sparkles className="w-4 h-4" />
@@ -439,160 +498,260 @@ export default function MonCompteTab({
               </button>
             </div>
 
-            <form onSubmit={handleAuthSubmit} className="space-y-3.5 text-xs">
-              
-              {/* SÉLECTEUR VISUEL DE RÔLE SI INSCRIPTION */}
-              {authMode === 'signup' && (
-                <div className="space-y-1.5">
-                  <label className="font-extrabold text-gray-700 block">Choisissez votre Rôle Utilisateur :</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAuthRole('buyer')}
-                      className={`p-2.5 rounded-2xl border text-center transition-all ${
-                        authRole === 'buyer' 
-                          ? 'border-[#FF6B00] bg-[#FF6B00]/10 text-[#FF6B00] font-black ring-2 ring-[#FF6B00]/20' 
-                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-base block">🛍️</span>
-                      <span className="text-[10px] font-bold block mt-0.5">Acheteur</span>
-                    </button>
+            {/* GOOGLE OAUTH FAST LOGIN BUTTON */}
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={authLoading}
+              className="w-full bg-white hover:bg-gray-50 text-gray-800 font-extrabold text-xs py-3 rounded-2xl border border-gray-300 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+              <span>Continuer avec Google (Gmail) 🌐</span>
+            </button>
+
+            <div className="flex items-center gap-3 my-1">
+              <div className="h-px bg-gray-200 flex-1"></div>
+              <span className="text-[10px] text-gray-400 font-bold uppercase">Ou avec numéro / email</span>
+              <div className="h-px bg-gray-200 flex-1"></div>
+            </div>
+
+            {/* AUTH METHOD SELECTOR */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-gray-100 rounded-2xl text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => { setAuthMethod('email'); setOtpSent(false); }}
+                className={`py-1.5 rounded-xl transition-all ${authMethod === 'email' ? 'bg-white text-[#1A1A1A] shadow-xs' : 'text-gray-500'}`}
+              >
+                Email / Mot de passe
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMethod('phone')}
+                className={`py-1.5 rounded-xl transition-all ${authMethod === 'phone' ? 'bg-white text-[#FF6B00] shadow-xs' : 'text-gray-500'}`}
+              >
+                SMS OTP (+225) 📲
+              </button>
+            </div>
+
+            {authMethod === 'phone' ? (
+              /* ================= FORM SMS OTP (+225) ================= */
+              <div className="space-y-3 text-xs">
+                {!otpSent ? (
+                  <form onSubmit={handleSendPhoneOtp} className="space-y-3">
+                    <div>
+                      <label className="font-bold text-gray-700 block mb-1">Numéro Téléphone Côte d'Ivoire (+225)</label>
+                      <div className="relative flex items-center">
+                        <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
+                        <input
+                          type="tel"
+                          value={authPhone}
+                          onChange={(e) => setAuthPhone(e.target.value)}
+                          placeholder="+225 0595610982"
+                          className="w-full p-3 pl-10 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
+                          required
+                        />
+                      </div>
+                    </div>
 
                     <button
-                      type="button"
-                      onClick={() => setAuthRole('seller')}
-                      className={`p-2.5 rounded-2xl border text-center transition-all ${
-                        authRole === 'seller' 
-                          ? 'border-purple-600 bg-purple-50 text-purple-600 font-black ring-2 ring-purple-600/20' 
-                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
+                      type="submit"
+                      disabled={authLoading}
+                      className="w-full bg-gradient-to-r from-[#FF6B00] to-[#FF8533] text-white font-black text-sm py-3.5 rounded-2xl shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all"
                     >
-                      <span className="text-base block">🏪</span>
-                      <span className="text-[10px] font-bold block mt-0.5">Vendeur</span>
+                      {authLoading ? 'Envoi du SMS...' : 'Recevoir le Code SMS (OTP)'}
                     </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleVerifyPhoneOtp} className="space-y-3">
+                    <div className="bg-orange-50 p-3 rounded-2xl border border-orange-200 text-[11px] text-orange-900">
+                      📲 Un code à 6 chiffres a été envoyé au <strong>{authPhone}</strong> (Code démo : <strong>123456</strong>)
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-gray-700 block mb-1">Entrez le code OTP reçu par SMS</label>
+                      <input
+                        type="text"
+                        value={otpToken}
+                        onChange={(e) => setOtpToken(e.target.value)}
+                        placeholder="123456"
+                        maxLength={6}
+                        className="w-full p-3 text-center tracking-widest text-lg font-black bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
+                        required
+                      />
+                    </div>
 
                     <button
-                      type="button"
-                      onClick={() => setAuthRole('courier')}
-                      className={`p-2.5 rounded-2xl border text-center transition-all ${
-                        authRole === 'courier' 
-                          ? 'border-[#00C853] bg-[#00C853]/10 text-[#00C853] font-black ring-2 ring-[#00C853]/20' 
-                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
+                      type="submit"
+                      disabled={authLoading}
+                      className="w-full bg-[#00C853] hover:bg-[#00B048] text-white font-black text-sm py-3.5 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
                     >
-                      <span className="text-base block">🛵</span>
-                      <span className="text-[10px] font-bold block mt-0.5">Livreur</span>
+                      {authLoading ? 'Vérification...' : 'Valider et Se Connecter ✅'}
                     </button>
+                  </form>
+                )}
+              </div>
+            ) : (
+              /* ================= FORM EMAIL / PASSWORD ================= */
+              <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
+                
+                {/* SÉLECTEUR VISUEL DE RÔLE SI INSCRIPTION */}
+                {authMode === 'signup' && (
+                  <div className="space-y-1.5">
+                    <label className="font-extrabold text-gray-700 block">Choisissez votre Rôle Utilisateur :</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAuthRole('buyer')}
+                        className={`p-2 rounded-2xl border text-center transition-all ${
+                          authRole === 'buyer' 
+                            ? 'border-[#FF6B00] bg-[#FF6B00]/10 text-[#FF6B00] font-black ring-2 ring-[#FF6B00]/20' 
+                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-base block">🛍️</span>
+                        <span className="text-[10px] font-bold block mt-0.5">Acheteur</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAuthRole('seller')}
+                        className={`p-2 rounded-2xl border text-center transition-all ${
+                          authRole === 'seller' 
+                            ? 'border-purple-600 bg-purple-50 text-purple-600 font-black ring-2 ring-purple-600/20' 
+                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-base block">🏪</span>
+                        <span className="text-[10px] font-bold block mt-0.5">Vendeur</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAuthRole('courier')}
+                        className={`p-2 rounded-2xl border text-center transition-all ${
+                          authRole === 'courier' 
+                            ? 'border-[#00C853] bg-[#00C853]/10 text-[#00C853] font-black ring-2 ring-[#00C853]/20' 
+                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-base block">🛵</span>
+                        <span className="text-[10px] font-bold block mt-0.5">Livreur</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* CHAMPS INSCRIPTION */}
+                {authMode === 'signup' && (
+                  <div>
+                    <label className="font-bold text-gray-700 block mb-1">Nom Complet / Nom de Boutique</label>
+                    <div className="relative flex items-center">
+                      <User className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={authFullName}
+                        onChange={(e) => setAuthFullName(e.target.value)}
+                        placeholder="ex: Daoud Daoud"
+                        className="w-full p-2.5 pl-10 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold text-gray-700 block mb-1">Téléphone CI</label>
+                    <div className="relative flex items-center">
+                      <Phone className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
+                      <input
+                        type="tel"
+                        value={authPhone}
+                        onChange={(e) => setAuthPhone(e.target.value)}
+                        placeholder="+225 0595610982"
+                        className="w-full p-2.5 pl-9 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-gray-700 block mb-1">Commune / Ville</label>
+                    <select
+                      value={authCity}
+                      onChange={(e) => setAuthCity(e.target.value)}
+                      className="w-full p-2.5 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
+                    >
+                      {COMMUNES.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              )}
 
-              {/* CHAMPS INSCRIPTION */}
-              {authMode === 'signup' && (
                 <div>
-                  <label className="font-bold text-gray-700 block mb-1">Nom Complet / Nom de Boutique</label>
+                  <label className="font-bold text-gray-700 block mb-1">Adresse Email</label>
                   <div className="relative flex items-center">
-                    <User className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
+                    <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
                     <input
-                      type="text"
-                      value={authFullName}
-                      onChange={(e) => setAuthFullName(e.target.value)}
-                      placeholder="ex: Daoud Daoud"
-                      className="w-full p-3 pl-10 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
+                      type="email"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="daoudd174@gmail.com"
+                      className="w-full p-2.5 pl-10 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">Mot de Passe</label>
+                  <div className="relative flex items-center">
+                    <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full p-2.5 pl-10 pr-10 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
                       required
                     />
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="font-bold text-gray-700 block mb-1">Téléphone CI</label>
-                  <div className="relative flex items-center">
-                    <Phone className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
-                    <input
-                      type="tel"
-                      value={authPhone}
-                      onChange={(e) => setAuthPhone(e.target.value)}
-                      placeholder="+225 0595610982"
-                      className="w-full p-3 pl-9 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
-                <div>
-                  <label className="font-bold text-gray-700 block mb-1">Commune / Ville</label>
-                  <select
-                    value={authCity}
-                    onChange={(e) => setAuthCity(e.target.value)}
-                    className="w-full p-3 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
-                  >
-                    {COMMUNES.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full bg-gradient-to-r from-[#FF6B00] to-[#FF8533] hover:from-[#E05E00] hover:to-[#FF6B00] text-white font-black text-sm py-3 rounded-2xl shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all mt-1"
+                >
+                  {authLoading ? (
+                    <span>Validation du compte...</span>
+                  ) : (
+                    <span>{authMode === 'signup' ? 'Créer mon Compte DJAGOBA 🚀' : 'Se Connecter à mon Compte'}</span>
+                  )}
+                </button>
 
-              <div>
-                <label className="font-bold text-gray-700 block mb-1">Adresse Email</label>
-                <div className="relative flex items-center">
-                  <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
-                  <input
-                    type="email"
-                    value={authEmail}
-                    onChange={(e) => setAuthEmail(e.target.value)}
-                    placeholder="daoudd174@gmail.com"
-                    className="w-full p-3 pl-10 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-gray-700 block mb-1">Mot de Passe</label>
-                <div className="relative flex items-center">
-                  <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={authPassword}
-                    onChange={(e) => setAuthPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full p-3 pl-10 pr-10 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
-                    required
-                  />
+                <div className="text-center pt-0.5">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 text-gray-400 hover:text-gray-600"
+                    onClick={() => setAuthMode(authMode === 'signup' ? 'signin' : 'signup')}
+                    className="text-xs font-bold text-gray-500 hover:text-[#FF6B00]"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {authMode === 'signup' ? 'Déjà inscrit ? Connectez-vous' : 'Pas de compte ? Inscrivez-vous gratuitement'}
                   </button>
                 </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full bg-gradient-to-r from-[#FF6B00] to-[#FF8533] hover:from-[#E05E00] hover:to-[#FF6B00] text-white font-black text-sm py-3.5 rounded-2xl shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all mt-2"
-              >
-                {authLoading ? (
-                  <span>Validation du compte...</span>
-                ) : (
-                  <span>{authMode === 'signup' ? 'Créer mon Compte DJAGOBA 🚀' : 'Se Connecter à mon Compte'}</span>
-                )}
-              </button>
-
-              <div className="text-center pt-1">
-                <button
-                  type="button"
-                  onClick={() => setAuthMode(authMode === 'signup' ? 'signin' : 'signup')}
-                  className="text-xs font-bold text-gray-500 hover:text-[#FF6B00]"
-                >
-                  {authMode === 'signup' ? 'Déjà inscrit ? Connectez-vous' : 'Pas de compte ? Inscrivez-vous gratuitement'}
-                </button>
-              </div>
-            </form>
+              </form>
+            )}
           </div>
         </div>
       )}

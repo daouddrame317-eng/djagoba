@@ -22,11 +22,11 @@ export const SUPABASE_URL     = rawSupabaseUrl;
 export const SUPABASE_ANON_KEY = rawSupabaseKey;
 
 // ─── AGORA.IO ─────────────────────────────────────────────────────────────────
-export const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID || '';
+export const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID || 'ACo631e6bbbcbd74d849096da10469a4a0f';
 export const IS_AGORA_CONFIGURED = AGORA_APP_ID.length > 0;
 
 // ─── ONESIGNAL ────────────────────────────────────────────────────────────────
-export const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || '';
+export const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID || '44a23ddb-bba3-4c3e-a83a-3faf2006f941';
 
 // ─── DIGITALPAYE ─────────────────────────────────────────────────────────────
 export const DIGITALPAYE_PUBLIC_KEY = import.meta.env.VITE_DIGITALPAYE_PUBLIC_KEY || '';
@@ -123,34 +123,3 @@ export const CATEGORIES_PRODUITS = [
   { id: 'maison',        name: 'Maison & Déco',       icon: '🏠' },
   { id: 'divers',        name: 'Divers',              icon: '🛍️' },
 ];
-
-/** Profil utilisateur de démo (quand Supabase non configuré) */
-export const DEMO_PROFILES = {
-  buyer: {
-    id:        'demo-buyer-001',
-    phone:     '+22507089912',
-    full_name: 'Awa Traoré',
-    role:      'buyer',
-    city:      'Cocody',
-    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    is_verified: true,
-  },
-  seller: {
-    id:        'demo-seller-001',
-    phone:     '+22505112233',
-    full_name: 'Koné Ibrahim',
-    role:      'seller',
-    city:      'Abidjan',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    is_verified: true,
-  },
-  courier: {
-    id:        'demo-courier-001',
-    phone:     '+22501223344',
-    full_name: 'Bamba Seydou',
-    role:      'courier',
-    city:      'Bingerville',
-    avatar_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=200&q=80',
-    is_verified: true,
-  },
-};

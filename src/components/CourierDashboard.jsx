@@ -195,6 +195,12 @@ export default function CourierDashboard({ currentUser, showToast }) {
                   </div>
                 </div>
 
+                {/* Escrow Notice */}
+                <div className="bg-emerald-50 rounded-2xl p-2 border border-emerald-200 text-[10px] text-emerald-900 font-medium flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#00C853] shrink-0" />
+                  <span>🔒 Séquestre Djagoba : Valider la livraison débloquera automatiquement le paiement vers le vendeur.</span>
+                </div>
+
                 {/* Action Buttons */}
                 <div className="flex items-center gap-2 pt-1">
                   {ord.delivery_status !== 'in_transit' && (
@@ -209,10 +215,10 @@ export default function CourierDashboard({ currentUser, showToast }) {
 
                   <button
                     onClick={() => handleUpdateStatus(ord.id, 'delivered')}
-                    className="flex-1 bg-[#00C853] hover:bg-[#00B048] text-white font-extrabold text-xs py-3 rounded-2xl shadow-lg shadow-green-600/25 flex items-center justify-center gap-1.5 active:scale-95"
+                    className="flex-1 bg-[#00C853] hover:bg-[#00B048] text-white font-extrabold text-xs py-3 rounded-2xl shadow-lg shadow-green-600/25 flex items-center justify-center gap-2 active:scale-95"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    Valider la Livraison
+                    Valider la Livraison (Libérer Séquestre)
                   </button>
                 </div>
               </div>

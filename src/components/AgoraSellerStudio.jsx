@@ -14,7 +14,7 @@ import {
   Radio,
   ShoppingBag
 } from 'lucide-react';
-import { startHostBroadcast, switchCameraTrack } from '../lib/agoraClient';
+import { startHostBroadcast, toggleCameraFacingMode } from '../lib/agoraClient';
 import { updateLivePinnedProduct, updateLiveStatus, fetchProductsBySeller } from '../lib/supabaseClient';
 
 export default function AgoraSellerStudio({ liveSession, onClose }) {
@@ -24,8 +24,8 @@ export default function AgoraSellerStudio({ liveSession, onClose }) {
     audioTrack: null,
     videoTrack: null,
     cameras: [],
-    currentCameraIndex: 0
   });
+  const [facingMode, setFacingMode] = useState('user'); // 'user' (Avant) | 'environment' (Arrière)
   const [cameraError, setCameraError] = useState(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [spectatorsCount, setSpectatorsCount] = useState(1);
@@ -54,7 +54,8 @@ export default function AgoraSellerStudio({ liveSession, onClose }) {
 
       const result = await startHostBroadcast({
         channel: channelName,
-        containerId: 'agora-local-publisher-container'
+        containerId: 'agora-local-publisher-container',
+        initialFacingMode: facingMode,
       });
 
       if (result.error) {
@@ -66,7 +67,6 @@ export default function AgoraSellerStudio({ liveSession, onClose }) {
           audioTrack: result.localAudioTrack,
           videoTrack: result.localVideoTrack,
           cameras: result.cameras || [],
-          currentCameraIndex: 0
         });
         setIsBroadcasting(true);
 
@@ -91,14 +91,11 @@ export default function AgoraSellerStudio({ liveSession, onClose }) {
     };
   }, [liveSession]);
 
-  // Basculer Caméra (Front/Back)
+  // Basculer Caméra (Avant / Arrière)
   const handleToggleCamera = async () => {
-    if (!agoraState.videoTrack || agoraState.cameras.length < 2) return;
-    const nextIndex = (agoraState.currentCameraIndex + 1) % agoraState.cameras.length;
-    const nextCamera = agoraState.cameras[nextIndex];
-    if (nextCamera) {
-      await switchCameraTrack(agoraState.videoTrack, nextCamera.deviceId);
-      setAgoraState((prev) => ({ ...prev, currentCameraIndex: nextIndex }));
+    if (agoraState.videoTrack) {
+      const nextMode = await toggleCameraFacingMode(agoraState.videoTrack, facingMode);
+      setFacingMode(nextMode);
     }
   };
 
@@ -195,22 +192,25 @@ export default function AgoraSellerStudio({ liveSession, onClose }) {
             </div>
           </div>
 
-          {/* CONTRÔLES WEBRTC : CAMÉRA, MICRO, CHANGER CAMÉRA */}
+          {/* CONTRÔLES WEBRTC : CAMÉRA, MICRO, CHANGER CAMÉRA (AVANT / ARRIÈRE) */}
           <div className="flex items-center justify-around bg-black/60 backdrop-blur-md p-3 rounded-2xl border border-white/20">
             <button
               onClick={handleToggleMic}
               className={`p-3 rounded-full border transition-all active:scale-95 ${
                 isMicMuted ? 'bg-[#FF003C] text-white border-[#FF003C]' : 'bg-white/20 text-white border-white/30'
               }`}
+              title={isMicMuted ? 'Activer le micro' : 'Couper le micro'}
             >
               {isMicMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5 text-[#00C853]" />}
             </button>
 
             <button
               onClick={handleToggleCamera}
-              className="p-3 bg-white/20 text-white rounded-full border border-white/30 active:scale-95 transition-all"
+              className="p-3 bg-white/20 hover:bg-white/30 text-white rounded-full border border-white/30 active:scale-95 transition-all flex items-center gap-1"
+              title={`Basculer caméra (actuelle: ${facingMode === 'user' ? 'Avant 🤳' : 'Arrière 📷'})`}
             >
               <SwitchCamera className="w-5 h-5 text-[#FF6B00]" />
+              <span className="text-[10px] font-bold uppercase">{facingMode === 'user' ? 'Avant' : 'Arrière'}</span>
             </button>
 
             <button
