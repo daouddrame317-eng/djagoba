@@ -130,6 +130,7 @@ export default function App() {
             setCurrentUser={setCurrentUser}
             isSellerMode={isSellerMode}
             setIsSellerMode={setIsSellerMode}
+            setActiveTab={setActiveTab}
             onStartNewLive={handleStartNewLive}
             showToast={showToast}
           />

@@ -24,31 +24,48 @@ export async function startHostBroadcast({ appId, channel, token = null, uid = n
   let cameras = [];
 
   try {
-    // 1. Activer le mode DualStream pour l'adaptation réseau dynamique (3G/4G)
+    // 1. Demande explicite d'accès aux périphériques caméra et micro
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      } catch (authErr) {
+        console.warn('Demande explicite getUserMedia refusée ou ignorée:', authErr);
+      }
+    }
+
+    // 2. Mode DualStream pour la résilience réseau mobile
     try {
       await client.enableDualStream();
     } catch (e) {
       console.warn('Dual stream initialization info:', e);
     }
 
-    // 2. Création de la piste microphone avec réduction de bruit
+    // 3. Piste microphone
     localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
       encoderConfig: 'speech_standard',
-      AEC: true, // Echo cancellation
-      ANS: true, // Noise suppression
+      AEC: true,
+      ANS: true,
     });
 
-    // 3. Création de la piste vidéo avec gestion dynamique de la caméra (facingMode: 'user' ou 'environment')
+    // 4. Bloc try/catch autour de createCameraVideoTrack avec fallback automatique vers 'environment'
     try {
       localVideoTrack = await AgoraRTC.createCameraVideoTrack({
-        encoderConfig: '720p_1', // Adaptatif pour le réseau mobile 3G/4G
+        encoderConfig: '720p_1',
         facingMode: initialFacingMode,
       });
-    } catch (camErr) {
-      console.warn('Erreur création vidéo avec facingMode, fallback générique:', camErr);
-      localVideoTrack = await AgoraRTC.createCameraVideoTrack({
-        encoderConfig: '360p_1',
-      });
+    } catch (camErrFront) {
+      console.warn('Erreur caméra frontale (user), bascule automatique sur caméra arrière (environment):', camErrFront);
+      try {
+        localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+          encoderConfig: '720p_1',
+          facingMode: 'environment',
+        });
+      } catch (camErrBack) {
+        console.warn('Erreur caméra arrière, fallback résolution 360p:', camErrBack);
+        localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+          encoderConfig: '360p_1',
+        });
+      }
     }
 
     // 4. Rejoindre le canal Agora RTC

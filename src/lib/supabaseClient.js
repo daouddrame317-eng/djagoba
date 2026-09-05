@@ -1,12 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Récupération des variables d'environnement Vite / Supabase
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://votre-projet.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'votre-cle-anon-publique';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const isSupabaseConfigured = 
   Boolean(supabaseUrl) && 
   supabaseUrl.startsWith('https://') && 
+  !supabaseUrl.includes('votre-projet') &&
   !supabaseUrl.includes('[VOTRE_SUPABASE_PROJECT_ID]');
 
 export const supabase = createClient(
@@ -52,18 +53,35 @@ export function clearLocalUser() {
 }
 
 /**
- * Formater un numéro de téléphone ivoirien au format international (+225)
+ * Liste des indicatifs pays pour SMS OTP (Afrique de l'Ouest)
  */
-export function formatIvoryCoastPhone(phone) {
-  let cleaned = (phone || '').replace(/\D/g, '');
+export const COUNTRY_CODES = [
+  { code: '+225', name: 'Côte d\'Ivoire', flag: '🇨🇮', digits: 10 },
+  { code: '+221', name: 'Sénégal', flag: '🇸🇳', digits: 9 },
+  { code: '+223', name: 'Mali', flag: '🇲🇱', digits: 8 },
+  { code: '+226', name: 'Burkina Faso', flag: '🇧🇫', digits: 8 },
+  { code: '+224', name: 'Guinée', flag: '🇬🇳', digits: 9 },
+  { code: '+229', name: 'Bénin', flag: '🇧🇯', digits: 8 },
+  { code: '+228', name: 'Togo', flag: '🇹🇬', digits: 8 },
+  { code: '+233', name: 'Ghana', flag: '🇬🇭', digits: 9 },
+];
+
+/**
+ * Formater automatiquement un numéro au format E.164 (ex: +225XXXXXXXXXX, +221XXXXXXXXX)
+ */
+export function formatInternationalPhone(phone, countryCode = '+225') {
+  let cleaned = (phone || '').trim().replace(/\D/g, '');
   if (!cleaned) return '';
-  if (cleaned.startsWith('225')) {
+
+  const prefixDigits = countryCode.replace(/\D/g, '');
+  if (cleaned.startsWith(prefixDigits)) {
     return `+${cleaned}`;
   }
-  if (cleaned.length === 10) {
-    return `+225${cleaned}`;
-  }
-  return `+225${cleaned}`;
+  return `${countryCode}${cleaned}`;
+}
+
+export function formatIvoryCoastPhone(phone) {
+  return formatInternationalPhone(phone, '+225');
 }
 
 // ============================================================================
@@ -91,7 +109,7 @@ export async function signInWithGoogle() {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: 'https://djagoba.vercel.app/',
       },
     });
     if (error) throw error;
@@ -112,10 +130,10 @@ export async function signInWithGoogle() {
 }
 
 /**
- * Envoyer un code OTP par SMS sur un numéro de téléphone CI (+225)
+ * Envoyer un code OTP par SMS avec indicatif pays au format E.164
  */
-export async function sendPhoneOtp(phone) {
-  const formattedPhone = formatIvoryCoastPhone(phone);
+export async function sendPhoneOtp(phone, countryCode = '+225') {
+  const formattedPhone = formatInternationalPhone(phone, countryCode);
 
   if (!isSupabaseConfigured) {
     return { success: true, formattedPhone, message: `Code SMS envoyé au ${formattedPhone} (Mode Simulation: Entrez 123456)` };
@@ -136,8 +154,8 @@ export async function sendPhoneOtp(phone) {
 /**
  * Valider le code OTP SMS reçu
  */
-export async function verifyPhoneOtp(phone, token, role = 'buyer', fullName = '') {
-  const formattedPhone = formatIvoryCoastPhone(phone);
+export async function verifyPhoneOtp(phone, token, role = 'buyer', fullName = '', countryCode = '+225') {
+  const formattedPhone = formatInternationalPhone(phone, countryCode);
 
   const fallbackUser = {
     id: `usr_${Date.now()}`,

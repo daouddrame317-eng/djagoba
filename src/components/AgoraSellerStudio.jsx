@@ -206,11 +206,11 @@ export default function AgoraSellerStudio({ liveSession, onClose }) {
 
             <button
               onClick={handleToggleCamera}
-              className="p-3 bg-white/20 hover:bg-white/30 text-white rounded-full border border-white/30 active:scale-95 transition-all flex items-center gap-1"
-              title={`Basculer caméra (actuelle: ${facingMode === 'user' ? 'Avant 🤳' : 'Arrière 📷'})`}
+              className="px-3.5 py-3 bg-[#FF6B00] hover:bg-[#E05E00] text-white font-extrabold text-xs rounded-xl border border-white/30 active:scale-95 transition-all flex items-center gap-1.5 shadow-md"
+              title="Changer de caméra (Avant / Arrière)"
             >
-              <SwitchCamera className="w-5 h-5 text-[#FF6B00]" />
-              <span className="text-[10px] font-bold uppercase">{facingMode === 'user' ? 'Avant' : 'Arrière'}</span>
+              <SwitchCamera className="w-5 h-5 text-white" />
+              <span>Changer de caméra ({facingMode === 'user' ? 'Avant 🤳' : 'Arrière 📷'})</span>
             </button>
 
             <button

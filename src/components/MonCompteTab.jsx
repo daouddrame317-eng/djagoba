@@ -40,7 +40,8 @@ import {
   createLiveInSupabase, 
   createProductInSupabase, 
   fetchProductsBySeller,
-  updateUserRole 
+  updateUserRole,
+  COUNTRY_CODES 
 } from '../lib/supabaseClient';
 import { triggerSellerLivePushNotification } from '../lib/pushNotifications';
 import { COMMUNES } from '../lib/config';
@@ -50,6 +51,7 @@ export default function MonCompteTab({
   setCurrentUser, 
   isSellerMode, 
   setIsSellerMode, 
+  setActiveTab,
   onStartNewLive,
   showToast 
 }) {
@@ -61,6 +63,7 @@ export default function MonCompteTab({
   const [authPassword, setAuthPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authPhone, setAuthPhone] = useState('');
+  const [authCountryCode, setAuthCountryCode] = useState('+225');
   const [authFullName, setAuthFullName] = useState('');
   const [authRole, setAuthRole] = useState('seller'); // 'buyer' | 'seller' | 'courier'
   const [authCity, setAuthCity] = useState('Bingerville');
@@ -86,6 +89,20 @@ export default function MonCompteTab({
     }
   }, [currentUser?.id, currentUser?.role]);
 
+  // Helper pour rediriger dynamiquement l'utilisateur selon son rôle
+  const redirectUserByRole = (userRole) => {
+    if (userRole === 'seller') {
+      setIsSellerMode(true);
+      if (setActiveTab) setActiveTab('compte');
+    } else if (userRole === 'courier') {
+      setIsSellerMode(false);
+      if (setActiveTab) setActiveTab('compte');
+    } else {
+      setIsSellerMode(false);
+      if (setActiveTab) setActiveTab('accueil');
+    }
+  };
+
   // Handle Google OAuth Sign In
   const handleGoogleSignIn = async () => {
     setAuthLoading(true);
@@ -95,21 +112,21 @@ export default function MonCompteTab({
       showToast(`❌ ${error}`);
     } else if (user) {
       setCurrentUser(user);
-      if (user.role === 'seller') setIsSellerMode(true);
+      redirectUserByRole(user.role || 'buyer');
       setIsAuthModalOpen(false);
       showToast(`🌐 Connecté avec Google : ${user.full_name || user.email}`);
     }
   };
 
-  // Handle Send Phone OTP SMS (+225)
+  // Handle Send Phone OTP SMS avec indicatif pays
   const handleSendPhoneOtp = async (e) => {
     e.preventDefault();
     if (!authPhone.trim()) {
-      showToast('❌ Veuillez renseigner votre numéro de téléphone (+225).');
+      showToast('❌ Veuillez renseigner votre numéro de téléphone.');
       return;
     }
     setAuthLoading(true);
-    const res = await sendPhoneOtp(authPhone);
+    const res = await sendPhoneOtp(authPhone, authCountryCode);
     setAuthLoading(false);
     if (res.success) {
       setOtpSent(true);
@@ -127,13 +144,13 @@ export default function MonCompteTab({
       return;
     }
     setAuthLoading(true);
-    const { user, error } = await verifyPhoneOtp(authPhone, otpToken, authRole, authFullName);
+    const { user, error } = await verifyPhoneOtp(authPhone, otpToken, authRole, authFullName, authCountryCode);
     setAuthLoading(false);
     if (error) {
       showToast(`❌ ${error}`);
     } else {
       setCurrentUser(user);
-      if (user.role === 'seller') setIsSellerMode(true);
+      redirectUserByRole(user.role || authRole);
       setIsAuthModalOpen(false);
       showToast(`🎉 Connexion SMS réussie ! Bienvenue ${user.full_name}`);
     }
@@ -176,7 +193,7 @@ export default function MonCompteTab({
         };
 
         setCurrentUser(loggedUser);
-        if (authRole === 'seller') setIsSellerMode(true);
+        redirectUserByRole(loggedUser.role || authRole);
         setIsAuthModalOpen(false);
         showToast(`🎉 Bienvenue ${cleanName} ! Compte ${authRole.toUpperCase()} activé.`);
       }
@@ -200,7 +217,7 @@ export default function MonCompteTab({
         };
 
         setCurrentUser(loggedUser);
-        if (loggedUser.role === 'seller') setIsSellerMode(true);
+        redirectUserByRole(loggedUser.role || 'buyer');
         setIsAuthModalOpen(false);
         showToast('✅ Connexion réussie !');
       }
@@ -534,27 +551,40 @@ export default function MonCompteTab({
                 onClick={() => setAuthMethod('phone')}
                 className={`py-1.5 rounded-xl transition-all ${authMethod === 'phone' ? 'bg-white text-[#FF6B00] shadow-xs' : 'text-gray-500'}`}
               >
-                SMS OTP (+225) 📲
+                SMS OTP ({authCountryCode}) 📲
               </button>
             </div>
 
             {authMethod === 'phone' ? (
-              /* ================= FORM SMS OTP (+225) ================= */
+              /* ================= FORM SMS OTP AVEC SÉLECTEUR DE PAYS ================= */
               <div className="space-y-3 text-xs">
                 {!otpSent ? (
                   <form onSubmit={handleSendPhoneOtp} className="space-y-3">
                     <div>
-                      <label className="font-bold text-gray-700 block mb-1">Numéro Téléphone Côte d'Ivoire (+225)</label>
-                      <div className="relative flex items-center">
-                        <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
-                        <input
-                          type="tel"
-                          value={authPhone}
-                          onChange={(e) => setAuthPhone(e.target.value)}
-                          placeholder="+225 0595610982"
-                          className="w-full p-3 pl-10 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
-                          required
-                        />
+                      <label className="font-bold text-gray-700 block mb-1">Téléphone & Indicatif Pays</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={authCountryCode}
+                          onChange={(e) => setAuthCountryCode(e.target.value)}
+                          className="p-3 bg-[#F8F9FA] rounded-xl border border-gray-200 font-extrabold text-xs focus:outline-none focus:border-[#FF6B00]"
+                        >
+                          {COUNTRY_CODES.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.flag} {c.code} ({c.name})
+                            </option>
+                          ))}
+                        </select>
+                        <div className="relative flex-1 flex items-center">
+                          <Phone className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
+                          <input
+                            type="tel"
+                            value={authPhone}
+                            onChange={(e) => setAuthPhone(e.target.value)}
+                            placeholder="0595610982"
+                            className="w-full p-3 pl-9 bg-[#F8F9FA] rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6B00]"
+                            required
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -569,7 +599,7 @@ export default function MonCompteTab({
                 ) : (
                   <form onSubmit={handleVerifyPhoneOtp} className="space-y-3">
                     <div className="bg-orange-50 p-3 rounded-2xl border border-orange-200 text-[11px] text-orange-900">
-                      📲 Un code à 6 chiffres a été envoyé au <strong>{authPhone}</strong> (Code démo : <strong>123456</strong>)
+                      📲 Un code à 6 chiffres a été envoyé au <strong>{authCountryCode} {authPhone}</strong> (Code démo : <strong>123456</strong>)
                     </div>
 
                     <div>

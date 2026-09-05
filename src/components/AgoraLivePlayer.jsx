@@ -41,23 +41,34 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
   // Agora State
   const [agoraConnected, setAgoraConnected] = useState(false);
   const [agoraError, setAgoraError] = useState(null);
+  const [agoraTimedOut, setAgoraTimedOut] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [hearts, setHearts] = useState([]);
   const [heartsCount, setHeartsCount] = useState(128);
+  const agoraTimeoutRef = useRef(null);
 
   const chatContainerRef = useRef(null);
 
-  // 1. Initialisation Agora RTC Audience Player (Connexion immédiate et réactive)
+  // 1. Initialisation Agora RTC Audience Player avec timeout 8 secondes
   useEffect(() => {
     let agoraClientInstance = null;
 
     async function initPlayer() {
       const channelName = live?.agora_channel_id || `channel_${live?.id}`;
-      
+
+      // Timeout 8s : si la vidéo ne s'établit pas, afficher un message d'erreur clair
+      agoraTimeoutRef.current = setTimeout(() => {
+        if (!agoraConnected) {
+          setAgoraTimedOut(true);
+        }
+      }, 8000);
+
       const { client, error } = await startAudiencePlayer({
         channel: channelName,
         containerId: 'agora-remote-player-container',
         onUserPublished: (user, mediaType) => {
+          clearTimeout(agoraTimeoutRef.current);
+          setAgoraTimedOut(false);
           setAgoraConnected(true);
         },
         onUserUnpublished: () => {
@@ -66,6 +77,7 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
       });
 
       if (error) {
+        clearTimeout(agoraTimeoutRef.current);
         setAgoraError(error);
       } else {
         agoraClientInstance = client;
@@ -77,6 +89,7 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
     }
 
     return () => {
+      clearTimeout(agoraTimeoutRef.current);
       if (agoraClientInstance) {
         agoraClientInstance.leave();
       }
@@ -222,7 +235,32 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
         
         {/* LECTEUR VIDÉO AGORA WEBRTC */}
         <div id="agora-remote-player-container" className="absolute inset-0 z-0 bg-gray-900">
-          {!agoraConnected && (
+          {/* Erreur définitive (SDK error ou timeout 8s) */}
+          {(agoraError || agoraTimedOut) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 text-white p-6 text-center z-10 space-y-3">
+              <img
+                src={live?.thumbnail_url || live?.seller?.avatar_url || 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80'}
+                alt="Direct"
+                className="absolute inset-0 w-full h-full object-cover opacity-40"
+              />
+              <div className="relative z-10 bg-black/80 backdrop-blur-md p-5 rounded-2xl space-y-2 max-w-xs">
+                <span className="text-3xl">📵</span>
+                <h4 className="text-sm font-extrabold">Impossible d'accéder à la caméra</h4>
+                <p className="text-[11px] text-gray-300">
+                  {agoraError || 'Vérifiez les autorisations de votre navigateur ou réessayez.'}
+                </p>
+                <button
+                  onClick={onClose}
+                  className="mt-2 bg-[#FF6B00] text-white text-xs font-bold px-4 py-2 rounded-xl w-full"
+                >
+                  Fermer le Direct
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Overlay de connexion (visible seulement tant que pas connecté ET pas de timeout) */}
+          {!agoraConnected && !agoraTimedOut && !agoraError && (
             <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-950 text-white p-6">
               <img
                 src={live?.thumbnail_url || live?.seller?.avatar_url || 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80'}
@@ -233,6 +271,7 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
                 <span className="w-3 h-3 bg-[#FF003C] rounded-full animate-ping mx-auto block" />
                 <h4 className="text-xs font-black">Connexion au Direct Agora.io...</h4>
                 <p className="text-[11px] text-gray-300">Salle RTC : {live?.agora_channel_id || live?.id}</p>
+                <p className="text-[10px] text-gray-400">Expiration dans 8s si pas de réponse</p>
               </div>
             </div>
           )}
