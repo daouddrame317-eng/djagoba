@@ -9,7 +9,7 @@ import AgoraLivePlayer from './components/AgoraLivePlayer';
 import AgoraSellerStudio from './components/AgoraSellerStudio';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import { Bell, X, CheckCircle, Info } from 'lucide-react';
-import { supabase, getUserProfile } from './lib/supabaseClient';
+import { supabase, getUserProfile, getLocalUser } from './lib/supabaseClient';
 import { initPushNotifications } from './lib/pushNotifications';
 
 export default function App() {
@@ -17,10 +17,10 @@ export default function App() {
   const [selectedCity, setSelectedCity] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Auth Global State
-  const [currentUser, setCurrentUser] = useState(null);
+  // Auth Global State (Restore local user session on mount)
+  const [currentUser, setCurrentUser] = useState(() => getLocalUser());
   const [activeLiveModal, setActiveLiveModal] = useState(null);
-  const [isSellerMode, setIsSellerMode] = useState(false);
+  const [isSellerMode, setIsSellerMode] = useState(() => getLocalUser()?.role === 'seller');
   const [toastMessage, setToastMessage] = useState(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -28,35 +28,29 @@ export default function App() {
   useEffect(() => {
     initPushNotifications();
 
-    // Récupérer la session Supabase Auth au démarrage
+    // Restoration session Supabase si active
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         getUserProfile(session.user.id).then((profile) => {
-          setCurrentUser(profile || {
-            id: session.user.id,
-            email: session.user.email,
-            full_name: session.user.user_metadata?.full_name || 'Utilisateur DJAGOBA',
-            role: session.user.user_metadata?.role || 'buyer',
-            city: session.user.user_metadata?.city || 'Bingerville',
-          });
+          if (profile) {
+            setCurrentUser(profile);
+            if (profile.role === 'seller') setIsSellerMode(true);
+          }
         });
       }
+    }).catch((err) => {
+      console.log('Session get error ignored:', err);
     });
 
     // Écouter les changements de session Auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         getUserProfile(session.user.id).then((profile) => {
-          setCurrentUser(profile || {
-            id: session.user.id,
-            email: session.user.email,
-            full_name: session.user.user_metadata?.full_name || 'Utilisateur DJAGOBA',
-            role: session.user.user_metadata?.role || 'buyer',
-            city: session.user.user_metadata?.city || 'Bingerville',
-          });
+          if (profile) {
+            setCurrentUser(profile);
+            if (profile.role === 'seller') setIsSellerMode(true);
+          }
         });
-      } else {
-        setCurrentUser(null);
       }
     });
 
