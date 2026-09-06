@@ -46,19 +46,25 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
   const [hearts, setHearts] = useState([]);
   const [heartsCount, setHeartsCount] = useState(128);
   const agoraTimeoutRef = useRef(null);
-
+  // Ref pour éviter le stale-closure dans setTimeout
+  const agoraConnectedRef = useRef(false);
   const chatContainerRef = useRef(null);
 
   // 1. Initialisation Agora RTC Audience Player avec timeout 8 secondes
   useEffect(() => {
     let agoraClientInstance = null;
+    // Reset à chaque montage
+    agoraConnectedRef.current = false;
+    setAgoraConnected(false);
+    setAgoraError(null);
+    setAgoraTimedOut(false);
 
     async function initPlayer() {
       const channelName = live?.agora_channel_id || `channel_${live?.id}`;
 
-      // Timeout 8s : si la vidéo ne s'établit pas, afficher un message d'erreur clair
+      // Timeout 8s : utilise le ref pour éviter le stale-closure
       agoraTimeoutRef.current = setTimeout(() => {
-        if (!agoraConnected) {
+        if (!agoraConnectedRef.current) {
           setAgoraTimedOut(true);
         }
       }, 8000);
@@ -68,10 +74,12 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
         containerId: 'agora-remote-player-container',
         onUserPublished: (user, mediaType) => {
           clearTimeout(agoraTimeoutRef.current);
+          agoraConnectedRef.current = true;
           setAgoraTimedOut(false);
           setAgoraConnected(true);
         },
         onUserUnpublished: () => {
+          agoraConnectedRef.current = false;
           setAgoraConnected(false);
         }
       });
@@ -86,6 +94,8 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
 
     if (live?.agora_channel_id || live?.id) {
       initPlayer();
+    } else {
+      setAgoraError('Aucun canal de direct disponible.');
     }
 
     return () => {
@@ -235,31 +245,75 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
         
         {/* LECTEUR VIDÉO AGORA WEBRTC */}
         <div id="agora-remote-player-container" className="absolute inset-0 z-0 bg-gray-900">
-          {/* Erreur définitive (SDK error ou timeout 8s) */}
-          {(agoraError || agoraTimedOut) && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 text-white p-6 text-center z-10 space-y-3">
+          
+          {/* Erreur SDK Agora immédiate */}
+          {agoraError && !agoraTimedOut && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 text-white p-6 text-center z-10">
+              <img
+                src={live?.thumbnail_url || live?.seller?.avatar_url || 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80'}
+                alt="Direct"
+                className="absolute inset-0 w-full h-full object-cover opacity-30"
+              />
+              <div className="relative z-10 bg-black/85 backdrop-blur-md p-5 rounded-2xl space-y-3 max-w-xs w-full">
+                <span className="text-4xl block">⚙️</span>
+                <h4 className="text-sm font-extrabold">Erreur de connexion Agora</h4>
+                <p className="text-[11px] text-gray-300 leading-relaxed">
+                  {agoraError}
+                </p>
+                <p className="text-[10px] text-amber-400 bg-amber-900/30 rounded-lg px-3 py-2">
+                  💡 Assurez-vous que l'App ID Agora est correct dans vos variables d'environnement.
+                </p>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => { setAgoraError(null); setAgoraTimedOut(false); }}
+                    className="flex-1 bg-[#FF6B00] text-white text-xs font-bold px-3 py-2.5 rounded-xl"
+                  >
+                    🔄 Réessayer
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="flex-1 bg-white/10 border border-white/20 text-white text-xs font-bold px-3 py-2.5 rounded-xl"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Timeout 8s : le vendeur n'a pas encore démarré ou connexion perdue */}
+          {agoraTimedOut && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 text-white p-6 text-center z-10">
               <img
                 src={live?.thumbnail_url || live?.seller?.avatar_url || 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80'}
                 alt="Direct"
                 className="absolute inset-0 w-full h-full object-cover opacity-40"
               />
-              <div className="relative z-10 bg-black/80 backdrop-blur-md p-5 rounded-2xl space-y-2 max-w-xs">
-                <span className="text-3xl">📵</span>
-                <h4 className="text-sm font-extrabold">Impossible d'accéder à la caméra</h4>
-                <p className="text-[11px] text-gray-300">
-                  {agoraError || 'Vérifiez les autorisations de votre navigateur ou réessayez.'}
+              <div className="relative z-10 bg-black/85 backdrop-blur-md p-5 rounded-2xl space-y-3 max-w-xs w-full">
+                <span className="text-4xl block">📡</span>
+                <h4 className="text-sm font-extrabold">Le vendeur n'est pas encore en direct</h4>
+                <p className="text-[11px] text-gray-300 leading-relaxed">
+                  Aucun flux vidéo reçu après 8 secondes. Le vendeur n'a peut-être pas encore démarré la diffusion.
                 </p>
-                <button
-                  onClick={onClose}
-                  className="mt-2 bg-[#FF6B00] text-white text-xs font-bold px-4 py-2 rounded-xl w-full"
-                >
-                  Fermer le Direct
-                </button>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => { setAgoraTimedOut(false); setAgoraError(null); setAgoraConnected(false); }}
+                    className="flex-1 bg-[#FF6B00] text-white text-xs font-bold px-3 py-2.5 rounded-xl"
+                  >
+                    🔄 Réessayer
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="flex-1 bg-white/10 border border-white/20 text-white text-xs font-bold px-3 py-2.5 rounded-xl"
+                  >
+                    Fermer
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Overlay de connexion (visible seulement tant que pas connecté ET pas de timeout) */}
+          {/* Overlay de connexion (visible tant que pas connecté, pas de timeout, pas d'erreur) */}
           {!agoraConnected && !agoraTimedOut && !agoraError && (
             <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-950 text-white p-6">
               <img
@@ -269,14 +323,15 @@ export default function AgoraLivePlayer({ live, currentUser, onClose, onPlaceOrd
               />
               <div className="absolute bg-black/70 backdrop-blur-md p-4 rounded-2xl text-center space-y-2">
                 <span className="w-3 h-3 bg-[#FF003C] rounded-full animate-ping mx-auto block" />
-                <h4 className="text-xs font-black">Connexion au Direct Agora.io...</h4>
-                <p className="text-[11px] text-gray-300">Salle RTC : {live?.agora_channel_id || live?.id}</p>
-                <p className="text-[10px] text-gray-400">Expiration dans 8s si pas de réponse</p>
+                <h4 className="text-xs font-black">Connexion au Direct...</h4>
+                <p className="text-[11px] text-gray-300">Canal : {live?.agora_channel_id || live?.id}</p>
+                <p className="text-[10px] text-gray-400">Expiration dans 8 secondes</p>
               </div>
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-black/90 pointer-events-none" />
         </div>
+
 
         {/* CŒURS ANIMÉS */}
         <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
